@@ -34,6 +34,13 @@ echo "STEP 2 - INSTALL APACHE2 WEB SERVER"
 echo "-------------------------------------------------------------------------------------------"
 apt install apache2 -y
 sed -i "s/Options Indexes FollowSymLinks/Options FollowSymLinks/" /etc/apache2/apache2.conf
+
+# sed -i "s/Listen 80/Listen 80\nListen 8080/" /etc/apache2/ports.conf        # Set ports 80 and 8080 to listen
+# sed -i "s/Listen 443/Listen 443\n\tListen 8443/" /etc/apache2/ports.conf    # Set ports 443 and 8443 to listen
+
+sed -i "s/Listen 80/Listen 8080/" /etc/apache2/ports.conf                     # Set port 8080 to listen
+sed -i "s/Listen 443/Listen 8443/" /etc/apache2/ports.conf                    # Set port 8443 to listen
+
 systemctl stop apache2.service
 systemctl start apache2.service
 systemctl enable apache2.service
@@ -121,7 +128,7 @@ echo " STEP 6: CONFIGURE THE NEW WORDPRESS SITE"
 echo "-------------------------------------------------------------------------------------------"
 
 cat <<EOT_wordpress_conf >> /etc/apache2/sites-available/wordpress.conf
-<VirtualHost *:80>
+<VirtualHost *:8080>                                           # Set port 8080 for Word Press
      ServerAdmin ffdavis@outlook.com
      DocumentRoot /var/www/html/wordpress/public_html
      ServerName ${SERVERNAMEALIAS}
@@ -148,7 +155,7 @@ echo " STEP 7: ENABLE THE WORDPRESS SITE AND REWRITE MODULE"
 echo "-------------------------------------------------------------------------------------------"
 a2ensite wordpress.conf
 a2enmod rewrite
-a2dissite 000-default.conf
+a2dissite 000-default.conf                     # Disable 000-default.conf 
 
 sudo systemctl reload apache2
 
@@ -177,12 +184,42 @@ wp --info
 mkdir -p /home/ubuntu/.wp-cli/cache
 chown -R www-data:www-data /home/ubuntu/.wp-cli/
 
+
+echo ""
+echo "STEP 10 - INSTALL NGINX AND CONFIGURE IT AS REVERSE PROXY"
+echo "-------------------------------------------------------------------------------------------"
+echo ""
+
+apt install nginx -y
+
+unlink /etc/nginx/sites-enabled/default
+
+cat <<EOF_revprox_conf >> /etc/nginx/sites-available/reverse-proxy.conf
+server {
+        listen 80;
+        listen [::]:80;
+
+        access_log /var/log/nginx/reverse-access.log;
+        error_log /var/log/nginx/reverse-error.log;
+
+        location / {
+                    proxy_pass http://127.0.0.1:8080;
+        }
+}
+EOF_revprox_conf
+
+ln -s /etc/nginx/sites-available/reverse-proxy.conf /etc/nginx/sites-enabled/reverse-proxy.conf
+
+# nginx -t
+
+systemctl restart nginx
+
 EOF
 
 set -x
 
 echo ""
-echo "STEP 10 - INSTALL WORDPRESS USING WP-CLI ON UBUNTU 18.04"
+echo "STEP 11 - INSTALL WORDPRESS USING WP-CLI ON UBUNTU 18.04"
 echo "-------------------------------------------------------------------------------------------"
 echo ""
 
@@ -192,7 +229,7 @@ sudo -u www-data wp core download
 
 sudo -u www-data wp core config --dbname='WP_database' --dbuser='wp_user' --dbpass='cacarulo99' --dbhost='localhost' --dbprefix='wp_'
 
-sudo -u www-data wp core install --url='http://wpserver.net' --title='Blog Title' --admin_user='adminfer' --admin_password='cacarulo99' --admin_email='ffdavis@ook.com'
+sudo -u www-data wp core install --url='http://wpserver.net:8080' --title='Blog Title' --admin_user='adminfer' --admin_password='cacarulo99' --admin_email='ffdavis@ook.com' # Add port 8080 here for WP
 
 sudo -u www-data wp plugin search woocommerce
 sudo -u www-data wp plugin install woocommerce
@@ -200,7 +237,7 @@ sudo -u www-data wp plugin activate woocommerce
 sudo -u www-data wp plugin list
 
 echo ""
-echo "STEP 11 - INSTALL THEMES"
+echo "STEP 12 - INSTALL THEMES"
 echo "-------------------------------------------------------------------------------------------"
 echo ""
 
@@ -212,3 +249,45 @@ cd /var/www/html/wordpress/public_html
 # To install and activate a theme:
 sudo -u www-data wp theme install basic
 sudo -u www-data wp theme activate basic
+
+<<COMMENT
+1.- HOW TO CHECK THAT APACHE2 IS RUNNING:
+
+  $ sudo netstat -tlpn | grep apache2
+  $ sudo netstat -tulpn
+    It shows apache2 running on ports 80 and 8080
+
+    Check with:
+  $ curl -i IP-address
+ 
+    Reload and restart Apache
+  $ sudo systemctl reload apache2
+  $ sudo systemctl restart apache2
+
+2.- QUERIES FOR MARIADB TO CHECK THE URL CONFIGURATION:
+
+  $ sudo /usr/bin/mysql -u root -pcacarulo99
+
+  > use WP_database
+  > select * from wp_options where option_name = 'home' OR option_name = 'siteurl';
+
+  option_id | option_name | option_value             | autoload |
+  +-----------+-------------+--------------------------+----------+
+  |         2 | home        | http://wpserver.net:8080 | yes      |
+  |         1 | siteurl     | http://wpserver.net:8080 | yes      |
+  +-----------+-------------+--------------------------+-------
+
+  > UPDATE `table_name` 
+    SET `field_name` = replace(field_name, 'old_text', 'new_text')
+
+  > UPDATE wp_options 
+    SET option_value = replace(option_value, 'http://www.oldurl.com:80','http://www.newurlcom:8080') 
+    WHERE option_name = 'home' OR option_name = 'siteurl';
+
+3.- HOW TO GET AND SET THE HOME AND SITEURL IN THE WORDPRESS DB
+  cd /var/www/html/wordpress/public_html
+  sudo -u www-data wp option get siteurl
+  sudo -u www-data wp option update home 'http://wpserver.net:8080'
+  sudo -u www-data wp option update siteurl 'http://wpserver.net:8080'
+
+COMMENT

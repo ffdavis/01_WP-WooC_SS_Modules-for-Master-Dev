@@ -9,22 +9,29 @@ resource "aws_security_group" "StoreOneSG" {
   vpc_id      = "${aws_vpc.StoreOneVPC.id}"
 
   ingress {
-    from_port   = 22
+    from_port   = 22            # SSH Port
     to_port     = 22
     protocol    = "TCP"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    from_port   = 80
+    from_port   = 80            # NGINX Port
     to_port     = 80
     protocol    = "TCP"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    from_port   = 3306
+    from_port   = 3306          # MariaDB port
     to_port     = 3306
+    protocol    = "TCP"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 8080          # Apache2 Web Server Port
+    to_port     = 8080
     protocol    = "TCP"
     cidr_blocks = ["0.0.0.0/0"]
   }

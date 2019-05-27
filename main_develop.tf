@@ -1,5 +1,5 @@
 locals {
-  env = "PROD" # It could be PROD, STAGING, DEV, etc                                        <-------------------------------
+  env = "DEVELOP" # It could be PROD, STAGING, DEV, etc                                                       <-----------
 }
 
 variable region {
@@ -12,9 +12,9 @@ provider "aws" {
   profile                 = "default"
 }
 
-module "StoreOne-PROD" {                        #                                           <-------------------------------
+module "StoreOne-DEVELOP" {
   # EC2 Variables
-  source = "./modules"
+  source = "./modules"     #                                                         <-----------
   region = "${var.region}"
 
   ami {
@@ -24,25 +24,23 @@ module "StoreOne-PROD" {                        #                               
   instance_type               = "t2.micro"
   associate_public_ip_address = "true"
   key_name                    = "myKey"
-  instance_name               = "StoreOne-ec2-${local.env}" # "StoreOne-ec2-Prod"
-  
-  # Note: Unable to pass subnet_id and vpc_secuirty_group_ids as variables from here
-  # as I have errors. Based on several notes from terraform forums, it is a general
-  # issue where you can't pass variables inside variables.
-  # I found a way as. subnet_id = "$$${var.subnet_id_var}" but still got an issue
-  # during terraform APPLY.
+  instance_name               = "StoreOne-ec2-${local.env}" # "StoreOne-ec2-Develop"
+
+  # Note: Unable to pass these 2 parameters from here as variables as this throws errors:
+  #      - subnet_id and 
+  #      - vpc_secuirty_group_ids 
+  # Based on several notes from terraform forums, it is a general issue where you can't pass variables inside variables.
+  # I found a way as. subnet_id = "$$${var.subnet_id_var}" but still got an issue when running terraform APPLY.
 
   # VPC & SUBNETS variables
   vpc_name           = "StoreOneVPC-${local.env}"
-  vpc_cidr           = "172.28.0.0/27"                   #                                  <-------------------------------
+  vpc_cidr           = "173.28.0.0/27"                 #                                                      <-----------
   subnet_public_name = "StoreOneSNPublic-${local.env}"
-  subnet_public_cidr = "172.28.0.0/28"                   #                                  <-------------------------------
-
+  subnet_public_cidr = "173.28.0.0/28"                 #                                                      <-----------
   # ROUTING & NETWORK
   ig_name   = "StoreOneGW-${local.env}"
   nacl_name = "StoreOneACL-${local.env}"
   rt_name   = "StoreOneRTPub-${local.env}"
-
   # SECURITY GROUPS
   sg_name = "StoreOneSG-${local.env}"
 }
@@ -59,3 +57,4 @@ module "StoreOne-PROD" {                        #                               
 #   http://wpserver.net/wp-admin 
 #      and verify that you can log in with the WordPress user you created in the previous step.
 #
+
